@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Library {
-    pub download: Download,
+    pub downloads: Download,
     pub name: String,
     pub rules: Option<Vec<Rule>>
 }
