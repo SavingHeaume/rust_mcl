@@ -4,6 +4,7 @@ use sha1::{Digest, Sha1};
 
 pub mod asset;
 pub mod library;
+pub mod version;
 
 pub trait Download {
     fn download(&self, game_dir: &Path) -> Result<(), Box<dyn std::error::Error>>;
