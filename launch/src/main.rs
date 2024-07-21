@@ -160,7 +160,7 @@ fn launch(sub_matches: &clap::ArgMatches) {
         jar_path.display()
     );
 
-    std::process::Command::new("jave")
+    std::process::Command::new("java")
         .current_dir(&game_dir)
         .arg(format!("-Djava.library.path={}", natives_dir.display()))
         .arg("-cp")
@@ -168,6 +168,7 @@ fn launch(sub_matches: &clap::ArgMatches) {
         .arg(&version.main_class)
         .arg("--username")
         .arg("meng")
+        .arg("--version")
         .arg(&version.id)
         .arg("--gameDir")
         .arg(game_dir)

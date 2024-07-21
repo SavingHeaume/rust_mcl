@@ -41,7 +41,7 @@ impl Download for Libraries {
 
         let libraries_dir = &game_dir.join("libraries");
         if !libraries_dir.exists() {
-            let _ = std::fs::create_dir_all(libraries_dir);
+            std::fs::create_dir_all(libraries_dir)?;
         }
 
         for library in self {
@@ -52,7 +52,7 @@ impl Download for Libraries {
             let library_file = &library.downloads.artifact.path;
             let library_path = &libraries_dir.join(library_file);
             if !library_path.parent().unwrap().exists() {
-                std::fs::create_dir_all(library_path)?;
+                std::fs::create_dir_all(library_path.parent().unwrap())?;
             }
 
             if library_path.exists() {
@@ -71,5 +71,26 @@ impl Download for Libraries {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use model::version::Version;
+
+    #[test]
+    fn test_download_library() {
+        let game = reqwest::blocking::get("https://piston-meta.mojang.com/v1/packages/177e49d3233cb6eac42f0495c0a48e719870c2ae/1.21.json")
+            .unwrap()
+            .json::<Version>()
+            .unwrap();
+
+        let download_path = &std::env::temp_dir().join("rust-minecraft-client-launch");
+        std::fs::create_dir_all(download_path).unwrap_or_else(|err| panic!("{:?}", err));
+
+        if let Err(err) = game.libraries.download(download_path) {
+            panic!("{:?}", err);
+        }
     }
 }
