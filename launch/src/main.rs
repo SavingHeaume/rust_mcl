@@ -1,6 +1,8 @@
 use clap::{arg, Command};
+use download::{get, Download, LibaryAllowed};
+use model::version::Version;
+use parse::Parse;
 use std::path::Path;
-use download::{get, Download};
 
 fn cli() -> Command {
     Command::new("rmcl")
@@ -41,6 +43,7 @@ fn main() {
     match matches.subcommand() {
         Some(("search", sub_matches)) => search(sub_matches),
         Some(("download", sub_matches)) => download(sub_matches),
+        Some(("launch", sub_matches)) => launch(sub_matches),
         _ => unreachable!(),
     }
 }
@@ -109,6 +112,73 @@ fn extract_jar(jar_path: &Path, dir: &Path) {
     }
 }
 
-fn lunch(sub_matches: &clap::ArgMatches) {
+fn launch(sub_matches: &clap::ArgMatches) {
+    let game_dir = std::env::current_dir().unwrap().join(".minecraft");
+    let libraries_dir = game_dir.join("libraries");
+    let assets_dir = game_dir.join("assets");
 
+    let version = sub_matches.get_one::<String>("VERSION").unwrap();
+    let version_dir = game_dir.join("versions").join(version);
+    let natives_dir = version_dir.join("natives");
+    let config_path = version_dir.join(format!("{}.json", version));
+    let jar_path = version_dir.join(format!("{}.jar", version));
+
+    if !jar_path.exists() || !config_path.exists() {
+        eprintln!("version: {} net found", version);
+        return;
+    }
+
+    let version = &Version::parse(&std::fs::read_to_string(&config_path).unwrap()).unwrap();
+    if !natives_dir.exists() {
+        std::fs::create_dir_all(&natives_dir).unwrap();
+    }
+
+    for library in &version.libraries {
+        if library.allowed() && library.name.contains("natives") {
+            extract_jar(
+                &libraries_dir.join(&library.downloads.artifact.path),
+                &natives_dir,
+            );
+        }
+    }
+
+    let classpath = format!(
+        "{}{}",
+        &version
+            .libraries
+            .iter()
+            .map(|library| {
+                format!(
+                    "{}{}",
+                    libraries_dir
+                        .join(&library.downloads.artifact.path)
+                        .display(),
+                    if cfg!(windows) { ";" } else { ":" }
+                )
+            })
+            .collect::<String>(),
+        jar_path.display()
+    );
+
+    std::process::Command::new("jave")
+        .current_dir(&game_dir)
+        .arg(format!("-Djava.library.path={}", natives_dir.display()))
+        .arg("-cp")
+        .arg(classpath)
+        .arg(&version.main_class)
+        .arg("--username")
+        .arg("meng")
+        .arg(&version.id)
+        .arg("--gameDir")
+        .arg(game_dir)
+        .arg("--assetDir")
+        .arg(assets_dir)
+        .arg("--assetIndex")
+        .arg(&version.asset_index.id)
+        .arg("--accessToken")
+        .arg("0")
+        .arg("--versionType")
+        .arg("RMCL 0.1.0")
+        .status()
+        .unwrap();
 }
