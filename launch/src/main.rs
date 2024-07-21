@@ -1,5 +1,6 @@
 use clap::{arg, Command};
-use download::get;
+use std::path::Path;
+use download::{get, Download};
 
 fn cli() -> Command {
     Command::new("rmcl")
@@ -39,6 +40,7 @@ fn main() {
 
     match matches.subcommand() {
         Some(("search", sub_matches)) => search(sub_matches),
+        Some(("download", sub_matches)) => download(sub_matches),
         _ => unreachable!(),
     }
 }
@@ -66,4 +68,47 @@ fn search(sub_matches: &clap::ArgMatches) {
     for version in versions {
         println!("Version: {}, {}", version.id, version.type_);
     }
+}
+
+fn download(sub_matches: &clap::ArgMatches) {
+    // 获取游戏路径
+    let game_dir = std::env::current_dir().unwrap().join(".minecraft");
+
+    let version = sub_matches.get_one::<String>("VERSION").unwrap();
+    let versions = get_version_manifest().versions;
+
+    if let Some(version) = versions.iter().find(|v| v.id.eq(version)) {
+        version.download(&game_dir).unwrap_or_else(|err| {
+            eprintln!("download error: {}", err);
+        });
+    } else {
+        eprintln!("Version: {} not found", version);
+    }
+}
+
+fn extract_jar(jar_path: &Path, dir: &Path) {
+    // 使用zip读取jar文件
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(jar_path).unwrap()).unwrap();
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).unwrap();
+        if entry.is_file() && !entry.name().contains("META_TNF") {
+            let mut name = entry.name();
+            if name.contains("/") {
+                name = &name[entry.name().rfind('/').unwrap() + 1..];
+            }
+
+            let path = dir.join(name);
+            if path.exists() {
+                std::fs::remove_file(&path).unwrap();
+            }
+
+            let mut file = std::fs::File::create(&path).unwrap();
+            std::io::copy(&mut entry, &mut file).unwrap();
+        }
+    }
+}
+
+fn lunch(sub_matches: &clap::ArgMatches) {
+
 }
