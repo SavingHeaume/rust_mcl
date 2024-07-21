@@ -1,6 +1,5 @@
-use sha1::{digest::core_api::CoreWrapper, Sha1Core};
-use std::path::Path;
 use sha1::{Digest, Sha1};
+use std::path::Path;
 
 pub mod asset;
 pub mod library;
@@ -8,19 +7,22 @@ pub mod version;
 
 pub trait Download {
     fn download(&self, game_dir: &Path) -> Result<(), Box<dyn std::error::Error>>;
-    
 }
 
 pub fn get<T: reqwest::IntoUrl>(url: T) -> reqwest::Result<reqwest::blocking::Response> {
-    reqwest::blocking::Client::builder()
+    let clinet = reqwest::blocking::Client::builder()
         .timeout(None)
-        .build()?
-        .get(url)
-        .send()
+        .build()
+        .expect("构建客户端失败");
+
+    clinet.get(url).send().map_err(|e| {
+        eprintln!("请求发送失败：{}", e);
+        e
+    })
 }
 
 pub fn sha1<P: AsRef<Path>>(path: P) -> Result<String, std::io::Error> {
-    let mut hasher: CoreWrapper<Sha1Core> = Sha1::new();
+    let mut hasher = Sha1::new();
 
     file_hashing::get_hash_file(path, &mut hasher)
 }

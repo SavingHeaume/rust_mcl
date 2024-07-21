@@ -44,10 +44,10 @@ fn main() {
 }
 
 fn get_version_manifest() -> model::version_manifest::VersionManifest {
-    return get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
-        .unwrap()
+    get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
+        .expect("Failed to send GET request")
         .json::<model::version_manifest::VersionManifest>()
-        .unwrap();
+        .expect("Failed to parse JSON")
 }
 
 fn search(sub_matches: &clap::ArgMatches) {
