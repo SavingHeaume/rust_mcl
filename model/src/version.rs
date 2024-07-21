@@ -5,11 +5,14 @@ pub type Libraries = Vec<Library>;
 
 #[derive(Deserialize)]
 pub struct Version {
+    #[serde(alias = "assetIndex")]
     pub asset_index: AssetIndex,
     pub downloads: Download,
     pub id: String,
     pub libraries: Libraries,
+    #[serde(alias = "mainClass")]
     pub main_class: String,
+    #[serde(alias = "releaseTime")]
     pub release_time: String,
     pub time: String,
     #[serde(alias = "type")]

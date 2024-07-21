@@ -19,5 +19,6 @@ pub struct Version {
     pub type_: String,
     pub url: String,
     pub time: String,
+    #[serde(alias = "releaseTime")]
     pub release_time: String,
 }
