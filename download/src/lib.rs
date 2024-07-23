@@ -15,10 +15,7 @@ pub fn get<T: reqwest::IntoUrl>(url: T) -> reqwest::Result<reqwest::blocking::Re
         .build()
         .expect("构建客户端失败");
 
-    clinet.get(url).send().map_err(|e| {
-        eprintln!("请求发送失败：{}", e);
-        e
-    })
+    clinet.get(url).send()
 }
 
 pub fn sha1<P: AsRef<Path>>(path: P) -> Result<String, std::io::Error> {

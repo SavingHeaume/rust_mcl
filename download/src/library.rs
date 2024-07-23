@@ -62,7 +62,7 @@ impl Download for Libraries {
         let game_dir = Arc::new(game_dir.to_path_buf());
 
         libraries.par_iter().for_each(|library| {
-            let result: Result<(), Box<dyn std::error::Error + Send + Sync>> = (|| {
+            let _result: Result<(), Box<dyn std::error::Error + Send + Sync>> = (|| {
                 let library_path = game_dir
                     .join("libraries")
                     .join(&library.downloads.artifact.path);
