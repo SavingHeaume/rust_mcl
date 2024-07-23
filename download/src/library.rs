@@ -1,6 +1,11 @@
-use model::{library, version::Libraries};
-
 use crate::{Download, LibaryAllowed};
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use model::{library, version::Libraries};
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
+use std::path::Path;
+use std::sync::Arc;
 
 impl LibaryAllowed for library::Library {
     fn allowed(&self) -> bool {
@@ -20,7 +25,7 @@ impl LibaryAllowed for library::Library {
                 }
             }
         }
-        
+
         if self.name.contains("natives") {
             if self.name.contains("x86") && !cfg!(target_arch = "x86") {
                 allowed = false;
@@ -36,39 +41,58 @@ impl LibaryAllowed for library::Library {
 }
 
 impl Download for Libraries {
-    fn download(&self, game_dir: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    fn download(&self, game_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         println!("Downloading Libraries");
 
         let libraries_dir = &game_dir.join("libraries");
         if !libraries_dir.exists() {
-            std::fs::create_dir_all(libraries_dir)?;
+            std::fs::create_dir_all(libraries_dir).unwrap();
         }
 
-        for library in self {
-            if !library.allowed() {
-                continue;
-            }
+        let libraries: Vec<_> = self.iter().filter(|lib| lib.allowed()).collect();
+        let libraries_count = libraries.len();
 
-            let library_file = &library.downloads.artifact.path;
-            let library_path = &libraries_dir.join(library_file);
-            if !library_path.parent().unwrap().exists() {
-                std::fs::create_dir_all(library_path.parent().unwrap())?;
-            }
+        let pb = ProgressBar::new(libraries_count as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+                .progress_chars("##-"),
+        );
 
-            if library_path.exists() {
-                if crate::sha1(library_path)?.eq(&library.downloads.artifact.sha1) {
-                    continue;
-                } else {
-                    std::fs::remove_dir(library_path)?;
+        let game_dir = Arc::new(game_dir.to_path_buf());
+
+        libraries.par_iter().for_each(|library| {
+            let result: Result<(), Box<dyn std::error::Error + Send + Sync>> = (|| {
+                let library_path = game_dir
+                    .join("libraries")
+                    .join(&library.downloads.artifact.path);
+
+                if !library_path.parent().unwrap().exists() {
+                    std::fs::create_dir_all(library_path.parent().unwrap()).unwrap();
                 }
-            }
 
-            let url = &library.downloads.artifact.url;
-            println!("Downloading library: {}", url);
+                if library_path.exists() {
+                    if crate::sha1(&library_path)
+                        .unwrap()
+                        .eq(&library.downloads.artifact.sha1)
+                    {
+                        pb.inc(1);
+                        return Ok(());
+                    } else {
+                        std::fs::remove_dir(&library_path).unwrap();
+                    }
+                }
 
-            let bytes = crate::get(url)?.bytes()?;
-            std::fs::write(library_path, bytes)?;
-        }
+                let url = &library.downloads.artifact.url;
+                let bytes = crate::get(url).unwrap().bytes().unwrap();
+                std::fs::write(&library_path, bytes).unwrap();
+                Ok(())
+            })();
+
+            pb.inc(1);
+        });
+
+        pb.finish_with_message("库文件下载完成");
 
         Ok(())
     }
