@@ -1,8 +1,11 @@
-use std::fs;
+use crate::get;
+use crate::Download;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 use model::asset::*;
 use parse::Parse;
-use crate::Download;
-use crate::get;
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 
 impl Download for AssetIndex {
     fn download(&self, game_dir: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -23,13 +26,20 @@ impl Download for AssetIndex {
         std::fs::write(path, text).unwrap();
 
         let index = Index::parse(text).unwrap();
-        
+
         let object_dir = &game_dir.join("assets").join("objects");
         if !object_dir.exists() {
             std::fs::create_dir_all(object_dir).unwrap();
         }
 
-        for (_, value) in index.objects {
+        let pb = ProgressBar::new(index.objects.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/bule} {pos:>7}/{len:7} {msg}")
+                .progress_chars("##-"),
+        );
+
+        index.objects.par_iter().for_each(|(_, value)| {
             let hash = &value.hash;
             let hash_first_two = &hash[0..2];
             let first_two_dir = &object_dir.join(hash_first_two);
@@ -40,25 +50,28 @@ impl Download for AssetIndex {
 
             let path = &first_two_dir.join(hash);
             if path.exists() {
-                if crate::sha1(path)?.eq(hash) {
-                    continue;
-                } else {
-                    std::fs::remove_file(path).unwrap();
+                if let Ok(file_hash) = crate::sha1(&path) {
+                    if file_hash == *hash {
+                        pb.inc(1);
+                        return;
+                    }
                 }
+                std::fs::remove_file(&path).unwrap();
             }
 
-            std::fs::File::create(path).unwrap();
             let url = format!(
                 "https://resources.download.minecraft.net/{}/{}",
                 hash_first_two, hash
             );
 
-            println!("Downloading asset: {}", url);
+            if let Ok(bytes) = get(&url).and_then(|r| r.bytes()) {
+                std::fs::write(&path, bytes).unwrap();
+            }
 
-            let bytes = get(&url).unwrap().bytes().unwrap();
-            fs::write(path, bytes)?;
-        }
+            pb.inc(1);
+        });
 
+        pb.finish_with_message("下载完成");
         Ok(())
     }
 }
